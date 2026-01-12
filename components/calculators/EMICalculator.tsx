@@ -3,20 +3,20 @@
 import React, { useState, useEffect } from 'react';
 
 // --- SVG Icons (inlined to avoid dependency) ---
-const Calculator = ({ size = 24, className = "" }) => (
+const Calculator = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="8" x2="16" y1="10" y2="10"/><line x1="8" x2="16" y1="14" y2="14"/><line x1="8" x2="16" y1="18" y2="18"/><line x1="12" x2="12" y1="6" y2="18"/></svg>
 );
 
-const RefreshCcw = ({ size = 24, className = "" }) => (
+const RefreshCcw = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
 );
 
-const Sparkles = ({ size = 24, className = "" }) => (
+const Sparkles = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.9 3.8-3.8 1.9 3.8 1.9L12 14.4l1.9-3.8 3.8-1.9-3.8-1.9L12 3zM22 12l-1.9 3.8-3.8 1.9 3.8 1.9L22 22l1.9-3.8 3.8-1.9-3.8-1.9L22 12zM3 12l-1.9 3.8-3.8 1.9 3.8 1.9L3 22l1.9-3.8 3.8-1.9-3.8-1.9L3 12z"/></svg>
 );
 
 // --- API Call to our backend ---
-const callGemini = async (prompt) => {
+const callGemini = async (prompt: string) => {
   try {
     const response = await fetch('/api/gemini', {
       method: 'POST',
@@ -37,7 +37,7 @@ const callGemini = async (prompt) => {
 };
 
 // --- Utility Functions ---
-const calculateEmi = (pv, r, n, m = 12) => {
+const calculateEmi = (pv: number, r: number, n: number, m: number = 12) => {
   if (!pv || !r || !n) return 0;
   let i = r / 100 / m;
   if (i === 0) return pv / (n * m);
@@ -46,7 +46,7 @@ const calculateEmi = (pv, r, n, m = 12) => {
 };
 
 // --- AI Advisor Component ---
-const AIAdvisor = ({ contextData, type }) => {
+const AIAdvisor = ({ contextData, type }: { contextData: string, type: string }) => {
   const [advice, setAdvice] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -84,28 +84,35 @@ const AIAdvisor = ({ contextData, type }) => {
 };
 AIAdvisor.displayName = 'AIAdvisor';
 
+interface EmiValues {
+  amount: string;
+  tenor: string;
+  yearTimes: string;
+  rate: string;
+}
+
 // --- EMI Calculator Component ---
 const EMICalculator = () => {
-  const [values, setValues] = useState({ amount: '', tenor: 5, yearTimes: 12, rate: 14.50 });
+  const [values, setValues] = useState<EmiValues>({ amount: '', tenor: '5', yearTimes: '12', rate: '14.50' });
   const [result, setResult] = useState(0);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setValues(prev => ({ ...prev, [name]: value }));
   };
 
-  const adjustValue = (field, delta) => {
+  const adjustValue = (field: 'tenor' | 'rate', delta: number) => {
     setValues(prev => {
-      let current = parseFloat(prev[field]) || 0;
+      const current = parseFloat(prev[field]) || 0;
       let newValue = current + delta;
       if (field === 'tenor') { if (newValue < 1) newValue = 1; if (newValue > 30) newValue = 30; }
       if (field === 'rate') { if (newValue < 0) newValue = 0; newValue = Math.round(newValue * 100) / 100; }
-      return { ...prev, [field]: newValue };
+      return { ...prev, [field]: newValue.toString() };
     });
   };
 
   const handleReset = () => {
-    setValues({ amount: '', tenor: 5, yearTimes: 12, rate: 14.50 });
+    setValues({ amount: '', tenor: '5', yearTimes: '12', rate: '14.50' });
     setResult(0);
   };
 
@@ -116,10 +123,13 @@ const EMICalculator = () => {
   useEffect(() => {
     const amount = parseFloat(values.amount) || 0;
     const rate = parseFloat(values.rate) || 0;
-    const tenor = parseInt(values.tenor) || 0;
-    const yearTimes = parseInt(values.yearTimes) || 12;
-    if (amount && rate && tenor) setResult(calculateEmi(amount, rate, tenor, yearTimes));
-    else setResult(0);
+    const tenor = parseInt(values.tenor, 10) || 0;
+    const yearTimes = parseInt(values.yearTimes, 10) || 12;
+    if (amount && rate && tenor) {
+        setResult(calculateEmi(amount, rate, tenor, yearTimes));
+    } else {
+        setResult(0);
+    }
   }, [values]);
 
   return (
@@ -141,7 +151,7 @@ const EMICalculator = () => {
                     <input type="number" name="tenor" min="1" max="30" value={values.tenor} onChange={handleChange} className="flex-grow w-full px-1 py-1.5 text-lg font-semibold bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-lg text-center focus:ring-1 focus:ring-yellow-400 dark:focus:ring-yellow-500 focus:outline-none h-9 text-gray-900 dark:text-gray-100" />
                     <button onClick={() => adjustValue('tenor', 1)} className="w-9 h-9 flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/50 dark:hover:bg-emerald-900/80 text-emerald-600 dark:text-emerald-400 rounded-lg font-bold text-lg transition-colors shadow-sm">+</button>
                 </div>
-                <input type="range" name="tenor" min="1" max="30" value={values.tenor || 1} onChange={handleChange} className="w-full h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-yellow-400 dark:accent-yellow-500 block" />
+                <input type="range" name="tenor" min="1" max="30" value={values.tenor || '1'} onChange={handleChange} className="w-full h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-yellow-400 dark:accent-yellow-500 block" />
                 <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium"><span>1Y</span><span>30Y</span></div>
             </div>
             
@@ -160,7 +170,7 @@ const EMICalculator = () => {
                 <input type="number" name="rate" value={values.rate} onChange={handleChange} className="flex-grow px-3 py-1.5 text-lg font-semibold bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-lg text-center focus:ring-1 focus:ring-yellow-400 dark:focus:ring-yellow-500 focus:outline-none h-9 text-gray-900 dark:text-gray-100" />
                 <button onClick={() => adjustValue('rate', 0.25)} className="w-9 h-9 flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/50 dark:hover:bg-emerald-900/80 text-emerald-600 dark:text-emerald-400 rounded-lg font-bold text-lg transition-colors shadow-sm">+</button>
             </div>
-            <input type="range" name="rate" min="1" max="25" step="0.25" value={values.rate || 1} onChange={handleChange} className="w-full h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-yellow-400 dark:accent-yellow-500" />
+            <input type="range" name="rate" min="1" max="25" step="0.25" value={values.rate || '1'} onChange={handleChange} className="w-full h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-yellow-400 dark:accent-yellow-500" />
              <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium"><span>1%</span><span>13%</span><span>25%</span></div>
         </div>
         <div className="pt-2">

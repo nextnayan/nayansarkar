@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 
 // --- SVG Icons (inlined to avoid dependency) ---
-const Briefcase = ({ size = 24, className = "" }) => (
+const Briefcase = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
     width={size} 
@@ -20,7 +20,7 @@ const Briefcase = ({ size = 24, className = "" }) => (
   </svg>
 );
 
-const Plus = ({ size = 24, className = "" }) => (
+const Plus = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
     width={size} 
@@ -38,7 +38,7 @@ const Plus = ({ size = 24, className = "" }) => (
   </svg>
 );
 
-const Trash2 = ({ size = 24, className = "" }) => (
+const Trash2 = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
     width={size} 
@@ -59,23 +59,42 @@ const Trash2 = ({ size = 24, className = "" }) => (
   </svg>
 );
 
+// --- Type Definitions ---
+interface Liability {
+    id: string | number;
+    bankName: string;
+    loanType: string;
+    limit: string | number;
+    outstanding: string | number;
+    emi: string | number;
+    isTakeover?: boolean;
+    isTopUp?: boolean;
+}
 
 // --- Utility Functions ---
-const calculateEmi = (pv, r, n, m = 12) => {
+const calculateEmi = (pv: number, r: number, n: number, m: number = 12): number => {
   if (!pv || !r || !n) return 0;
   let i = r / 100 / m;
   if (i === 0) return pv / (n * m);
   return Math.round((pv * i) / (1 - Math.pow(1 + i, -(n * m))));
 };
 
-const formatNum = (num) => (typeof num === 'number' ? num.toLocaleString('en-IN') : num || '-');
+const formatNum = (num: number | string): string => (typeof num === 'number' ? num.toLocaleString('en-IN') : (num || '-'));
 
 // --- Constants ---
 const OTHER_BANK_LOAN_TYPES = ['PL', 'HBL', 'OD', 'CARD', 'OTHER'];
 const CBBL_LOAN_TYPES = ['PL', 'HBL', 'OD', 'CARD', 'BPS', 'GPF', 'AGRI-BP', 'OTHER'];
 
 // --- Sub-Components ---
-const LiabilityRow = React.memo(({ item, onChange, onRemove, isCbbl, loanTypes }) => {
+interface LiabilityRowProps {
+  item: Liability;
+  onChange: (id: string | number, field: string, value: string | boolean) => void;
+  onRemove: (id: string | number) => void;
+  isCbbl: boolean;
+  loanTypes: string[];
+}
+
+const LiabilityRow: React.FC<LiabilityRowProps> = React.memo(({ item, onChange, onRemove, isCbbl, loanTypes }) => {
   return (
     <div className="bg-slate-50 dark:bg-zinc-800/50 p-px rounded mb-px text-xs animate-fade-in flex items-center gap-px border border-blue-100 dark:border-zinc-700">
       <input 
@@ -119,7 +138,7 @@ const LiabilityRow = React.memo(({ item, onChange, onRemove, isCbbl, loanTypes }
             <input 
               type="checkbox" 
               id={`check-${item.id}`} 
-              checked={isCbbl ? item.isTopUp : item.isTakeover} 
+              checked={!!(isCbbl ? item.isTopUp : item.isTakeover)} 
               onChange={(e) => onChange(item.id, isCbbl ? 'isTopUp' : 'isTakeover', e.target.checked)} 
               className="w-3 h-3 text-blue-600 rounded cursor-pointer mb-0.5" 
             />
@@ -140,51 +159,56 @@ const BPSLoanEligibilityCalculator = () => {
   const [salary, setSalary] = useState('');
   const [bpsRate, setBpsRate] = useState(13.75);
   
-  const [otherLiabilities, setOtherLiabilities] = useState([
+  const [otherLiabilities, setOtherLiabilities] = useState<Liability[]>([
     { id: 'init_other', bankName: '', loanType: 'PL', limit: '', outstanding: '', emi: '', isTakeover: false }
   ]);
-  const [cbblLiabilities, setCbblLiabilities] = useState([
+  const [cbblLiabilities, setCbblLiabilities] = useState<Liability[]>([
     { id: 'init_cbbl', bankName: '', loanType: 'PL', limit: '', outstanding: '', emi: '', isTopUp: false }
   ]);
 
   // --- Actions ---
-  const addLiability = useCallback((isCbbl) => {
-    const newItem = { 
+  const addLiability = useCallback((isCbbl: boolean) => {
+    const newItem: Omit<Liability, 'isTakeover' | 'isTopUp'> & { isTakeover?: boolean, isTopUp?: boolean } = { 
       id: Date.now(), 
       bankName: '', 
       loanType: 'PL', 
       limit: '', 
       outstanding: '', 
-      emi: '', 
-      [isCbbl ? 'isTopUp' : 'isTakeover']: false 
+      emi: '',
     };
-    if (isCbbl) setCbblLiabilities(prev => [...prev, newItem]);
-    else setOtherLiabilities(prev => [...prev, newItem]);
+    if (isCbbl) {
+        newItem.isTopUp = false;
+        setCbblLiabilities(prev => [...prev, newItem as Liability]);
+    } else {
+        newItem.isTakeover = false;
+        setOtherLiabilities(prev => [...prev, newItem as Liability]);
+    }
   }, []);
 
-  const updateLiability = useCallback((isCbbl, id, field, value) => {
-    const updateFn = (prev) => prev.map(item => {
-      if (item.id !== id) return item;
+  const updateLiability = useCallback((isCbbl: boolean, id: string | number, field: string, value: string | number | boolean) => {
+    const updater = (liabilities: Liability[]): Liability[] => 
+      liabilities.map(item => {
+        if (item.id !== id) return item;
       
-      const updatedItem = { ...item, [field]: value };
-      
-      if (updatedItem.loanType === 'CARD') {
-        if (isCbbl) {
-          updatedItem.emi = '';
-        } else {
-          const limit = parseFloat(updatedItem.limit) || 0;
-          const outstanding = parseFloat(updatedItem.outstanding) || 0;
-          updatedItem.emi = Math.round(Math.max(limit * 0.03, outstanding * 0.05));
+        const updatedItem = { ...item, [field]: value };
+        
+        if (updatedItem.loanType === 'CARD') {
+          if (isCbbl) {
+            updatedItem.emi = '';
+          } else {
+            const limit = parseFloat(String(updatedItem.limit)) || 0;
+            const outstanding = parseFloat(String(updatedItem.outstanding)) || 0;
+            updatedItem.emi = Math.round(Math.max(limit * 0.03, outstanding * 0.05));
+          }
         }
-      }
-      return updatedItem;
-    });
+        return updatedItem;
+      });
 
-    if (isCbbl) setCbblLiabilities(updateFn);
-    else setOtherLiabilities(updateFn);
+    if (isCbbl) setCbblLiabilities(updater);
+    else setOtherLiabilities(updater);
   }, []);
 
-  const removeLiability = useCallback((isCbbl, id) => {
+  const removeLiability = useCallback((isCbbl: boolean, id: string | number) => {
     if (isCbbl) setCbblLiabilities(prev => prev.filter(i => i.id !== id));
     else setOtherLiabilities(prev => prev.filter(i => i.id !== id));
   }, []);
@@ -198,13 +222,13 @@ const BPSLoanEligibilityCalculator = () => {
 
   // --- Derived State (Calculations) ---
   const { subTotalOther, subTotalCbbl, totalStats } = useMemo(() => {
-    const calculateTotals = (list, isCbbl) => {
+    const calculateTotals = (list: Liability[], isCbbl: boolean) => {
       let limit = 0, outstanding = 0, emi = 0, liabilityEmi = 0;
       
       list.forEach(item => {
-        const iLimit = parseFloat(item.limit) || 0;
-        const iOut = parseFloat(item.outstanding) || 0;
-        const iEmi = parseFloat(item.emi) || 0;
+        const iLimit = parseFloat(String(item.limit)) || 0;
+        const iOut = parseFloat(String(item.outstanding)) || 0;
+        const iEmi = parseFloat(String(item.emi)) || 0;
         const isExcluded = isCbbl ? item.isTopUp : item.isTakeover;
 
         limit += iLimit;
@@ -237,14 +261,14 @@ const BPSLoanEligibilityCalculator = () => {
 
   const { upToEmi, tableData } = useMemo(() => {
     const sal = parseFloat(salary) || 0;
-    const rate = parseFloat(bpsRate) || 0;
+    const rate = bpsRate || 0;
     
     if (sal <= 0 || rate <= 0) return { upToEmi: 0, tableData: [] };
 
     const emiAbility = Math.floor(Math.abs(sal) * 0.6);
     const calculatedUpToEmi = emiAbility - totalStats.liability;
     
-    const rows = [];
+    const rows: {tenor: number, amount: string|number, emi: number}[] = [];
     for (let i = 1; i <= 10; i++) {
       const emiPerLakh = calculateEmi(100000, rate, i);
       let loanAmt = 0;
@@ -253,7 +277,7 @@ const BPSLoanEligibilityCalculator = () => {
         loanAmt = Math.floor(rawLoan / 1000) * 1000;
       }
 
-      let displayAmt = loanAmt;
+      let displayAmt: string | number = loanAmt;
       if (loanAmt < 49999) displayAmt = "Not eligible";
       else if (loanAmt > 2000000) displayAmt = 2000000;
 
@@ -267,10 +291,10 @@ const BPSLoanEligibilityCalculator = () => {
     return { upToEmi: calculatedUpToEmi, tableData: rows };
   }, [salary, bpsRate, totalStats.liability]);
 
-  const handleOtherChange = useCallback((id, f, v) => updateLiability(false, id, f, v), [updateLiability]);
-  const handleCbblChange = useCallback((id, f, v) => updateLiability(true, id, f, v), [updateLiability]);
-  const handleOtherRemove = useCallback((id) => removeLiability(false, id), [removeLiability]);
-  const handleCbblRemove = useCallback((id) => removeLiability(true, id), [removeLiability]);
+  const handleOtherChange = useCallback((id: string | number, f: string, v: string | boolean) => updateLiability(false, id, f, v), [updateLiability]);
+  const handleCbblChange = useCallback((id: string | number, f: string, v: string | boolean) => updateLiability(true, id, f, v), [updateLiability]);
+  const handleOtherRemove = useCallback((id: string | number) => removeLiability(false, id), [removeLiability]);
+  const handleCbblRemove = useCallback((id: string | number) => removeLiability(true, id), [removeLiability]);
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-sm p-3 max-w-2xl mx-auto border-t-4 border-blue-500 dark:border-blue-800 animate-fade-in">
@@ -283,7 +307,7 @@ const BPSLoanEligibilityCalculator = () => {
         <input 
           type="number" 
           value={bpsRate} 
-          onChange={(e) => setBpsRate(e.target.value)} 
+          onChange={(e) => setBpsRate(Number(e.target.value))} 
           className="w-16 px-1 py-0.5 text-xs border bg-white dark:bg-zinc-800 border-red-300 dark:border-red-500/50 rounded focus:ring-1 focus:ring-red-500 focus:outline-none text-red-600 dark:text-red-400 font-bold" 
         />
       </div>
@@ -291,7 +315,7 @@ const BPSLoanEligibilityCalculator = () => {
       <div className="mb-4">
         <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-0.5">Gross Salary</label>
         <input 
-          type="text"
+          type="number"
           inputMode="decimal"
           value={salary} 
           onChange={(e) => setSalary(e.target.value)} 
